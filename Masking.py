@@ -4,11 +4,12 @@ import numpy as np
 
 class Masking:
     def __init__(self, frame_width, frame_height):
-        self.bg_substractor = None
+        self.bg_subtractor = None
         self.bg_subtractor_lr = 0
-        self.bg_sub_threshold = 30
+        self.bg_sub_threshold = 50
 
         self.hand_hist = None
+        self.blur_value = 41
 
         self.top = 0
         self.right = frame_width // 2
@@ -21,18 +22,19 @@ class Masking:
         self.xs = [7.0 / 20.0, 9.0 / 20.0, 11.0 / 20.0]
         self.ys = [7.0 / 20.0, 9.0 / 20.0, 11.0 / 20.0]
 
-    def init_bg_substractor(self):
-        self.bg_substractor = cv2.createBackgroundSubtractorMOG2(10, self.bg_sub_threshold)
+    def init_bg_subtractor(self):
+        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(0, self.bg_sub_threshold)
         self.is_bg_captured = True
 
     def bg_sub_masking(self, frame):
-        fgmask = self.bg_substractor.apply(frame, learningRate=self.bg_subtractor_lr)
+        fgmask = self.bg_subtractor.apply(frame, learningRate=self.bg_subtractor_lr)
 
-        kernel = np.ones((4, 4), np.uint8)
+        kernel = np.ones((3, 3), np.uint8)
         # MORPH_OPEN removes noise
         # MORPH_CLOSE closes the holes in the object
-        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel, iterations=2)
-        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        # fgmask = cv2.erode(fgmask, kernel, iterations=1)
+        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel, iterations=1)
+        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, iterations=1)
 
         return cv2.bitwise_and(frame, frame, mask=fgmask)
 
@@ -41,7 +43,9 @@ class Masking:
 
     def threshold(self, mask):
         gray_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray_mask, 0, 255, 0)
+        # blur_mask = cv2.GaussianBlur(gray_mask, (self.blur_value, self.blur_value), 0)
+        # _, thresh = cv2.threshold(blur_mask, 0, 255, 0)
+        _, thresh = cv2.threshold(gray_mask, 60, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         return thresh
 
     def draw_rect(self, frame):
@@ -82,12 +86,13 @@ class Masking:
         disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
         cv2.filter2D(dst, -1, disc, dst)
 
-        ret, thresh = cv2.threshold(dst, 150, 255, cv2.THRESH_BINARY)
+        ret, thresh = cv2.threshold(dst, 60, 255, cv2.THRESH_BINARY)
 
         kernel = np.ones((5, 5), np.uint8)
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=7)
-        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=7)
-        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=7)
-        thresh = cv2.merge((thresh, thresh, thresh))
+        thresh = cv2.dilate(thresh, kernel, iterations=13)
+        # thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=7)
+        # thresh = cv2.erode(thresh, kernel, iterations=5)
 
+        thresh = cv2.merge((thresh, thresh, thresh))
         return cv2.bitwise_and(frame, thresh)

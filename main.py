@@ -22,6 +22,7 @@ def main():
 
     while capture.isOpened():
         _, frame = capture.read()
+        frame = cv2.bilateralFilter(frame, 5, 50, 100)
         frame = cv2.flip(frame, 1)
 
         pressed_key = cv2.waitKey(1) & 0xFF
@@ -29,12 +30,12 @@ def main():
         # get the ROI
         roi = frame[top:bottom, right:left]
 
-        roi = cv2.bilateralFilter(roi, 5, 50, 100)
+        # roi = cv2.bilateralFilter(roi, 5, 50, 100)
 
         if pressed_key == ord('h'):
             mask.create_hand_hist(roi)
         elif pressed_key == ord('b'):
-            mask.init_bg_substractor()
+            mask.init_bg_subtractor()
 
         cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
 
@@ -50,7 +51,7 @@ def main():
             m = cv2.bitwise_and(bg_sub_mask, hist_mask)
             cv2.imshow("Mask", m)
 
-            cv2.imshow("thresh_mask", mask.threshold(bg_sub_mask))
+            cv2.imshow("thresh_mask", mask.threshold(m))
         elif not mask.is_hand_hist_created:
             roi = mask.draw_rect(roi)
 

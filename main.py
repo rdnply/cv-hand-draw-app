@@ -31,14 +31,28 @@ def main():
 
         roi = cv2.bilateralFilter(roi, 5, 50, 100)
 
-        if pressed_key == ord('s'):
+        if pressed_key == ord('h'):
+            mask.create_hand_hist(roi)
+        elif pressed_key == ord('b'):
             mask.init_bg_substractor()
 
         cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
 
-        if mask.is_bg_captured:
+        if mask.is_hand_hist_created and mask.is_bg_captured:
             bg_sub_mask = mask.bg_sub_masking(roi)
-            cv2.imshow("Mask", bg_sub_mask)
+            hist_mask = mask.hist_masking(roi)
+            cv2.imshow("hist_mask", hist_mask)
+            cv2.imshow("bg_mask", bg_sub_mask)
+
+            cv2.imshow("thr_hist_mask", mask.threshold(hist_mask))
+            cv2.imshow("thr_bg_mask", mask.threshold(bg_sub_mask))
+
+            m = cv2.bitwise_and(bg_sub_mask, hist_mask)
+            cv2.imshow("Mask", m)
+
+            cv2.imshow("thresh_mask", mask.threshold(bg_sub_mask))
+        elif not mask.is_hand_hist_created:
+            roi = mask.draw_rect(roi)
 
         cv2.imshow("Camera", rescale_frame(roi))
 

@@ -18,6 +18,9 @@ class Masking:
         self.is_hand_hist_created = False
         self.is_bg_captured = False
 
+        self.xs = [7.0 / 20.0, 9.0 / 20.0, 11.0 / 20.0]
+        self.ys = [7.0 / 20.0, 9.0 / 20.0, 11.0 / 20.0]
+
     def init_bg_substractor(self):
         self.bg_substractor = cv2.createBackgroundSubtractorMOG2(10, self.bg_sub_threshold)
         self.is_bg_captured = True
@@ -30,7 +33,61 @@ class Masking:
         # MORPH_CLOSE closes the holes in the object
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel, iterations=2)
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, iterations=2)
+
         return cv2.bitwise_and(frame, frame, mask=fgmask)
 
     def get_roi_coord(self):
         return self.top, self.right, self.bottom, self.left
+
+    def threshold(self, mask):
+        gray_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        _, thresh = cv2.threshold(gray_mask, 0, 255, 0)
+        return thresh
+
+    def draw_rect(self, frame):
+        rows, cols, _ = frame.shape
+
+        frame_with_rect = frame.copy()
+
+        for x in self.xs:
+            for y in self.ys:
+                x0, y0 = int(x * rows), int(y * cols)
+                cv2.rectangle(frame_with_rect, (y0, x0), (y0 + 20, x0 + 20), (0, 255, 0), 1)
+
+        return frame_with_rect
+
+    def create_hand_hist(self, frame):
+        rows, cols, _ = frame.shape
+        hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        roi = np.zeros([180, 20, 3], dtype=hsv_frame.dtype)
+
+        i = 0
+        for x in self.xs:
+            for y in self.ys:
+                x0, y0 = int(x * rows), int(y * cols)
+                roi[i * 20:i * 20 + 20, :, :] = hsv_frame[x0:x0 + 20, y0:y0 + 20, :]
+
+                i += 1
+
+        hand_hist = cv2.calcHist([roi], [0, 1], None, [180, 256], [0, 180, 0, 256])
+        self.hand_hist = cv2.normalize(hand_hist, hand_hist, 0, 255, cv2.NORM_MINMAX)
+        self.is_hand_hist_created = True
+
+        return self.hand_hist
+
+    def hist_masking(self, frame):
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        dst = cv2.calcBackProject([hsv], [0, 1], self.hand_hist, [0, 180, 0, 256], 1)
+
+        disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+        cv2.filter2D(dst, -1, disc, dst)
+
+        ret, thresh = cv2.threshold(dst, 150, 255, cv2.THRESH_BINARY)
+
+        kernel = np.ones((5, 5), np.uint8)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=7)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=7)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=7)
+        thresh = cv2.merge((thresh, thresh, thresh))
+
+        return cv2.bitwise_and(frame, thresh)

@@ -41,13 +41,6 @@ class Masking:
     def get_roi_coord(self):
         return self.top, self.right, self.bottom, self.left
 
-    def threshold(self, mask):
-        gray_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-        # blur_mask = cv2.GaussianBlur(gray_mask, (self.blur_value, self.blur_value), 0)
-        # _, thresh = cv2.threshold(blur_mask, 0, 255, 0)
-        _, thresh = cv2.threshold(gray_mask, 60, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        return thresh
-
     def draw_rect(self, frame):
         rows, cols, _ = frame.shape
 
@@ -96,3 +89,9 @@ class Masking:
 
         thresh = cv2.merge((thresh, thresh, thresh))
         return cv2.bitwise_and(frame, thresh)
+
+    def get_overall_mask(self, frame):
+        bg_sub_mask = self.bg_sub_masking(frame)
+        hist_mask = self.hist_masking(frame)
+
+        return cv2.bitwise_and(bg_sub_mask, hist_mask)

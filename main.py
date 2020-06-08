@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+from DetectFingers import DetectFingers
 from Masking import Masking
 
 
@@ -17,6 +18,7 @@ def main():
     frame_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     mask = Masking(frame_width, frame_height)
+    detect = DetectFingers()
 
     top, right, bottom, left = mask.get_roi_coord()
 
@@ -29,8 +31,6 @@ def main():
 
         # get the ROI
         roi = frame[top:bottom, right:left]
-
-        # roi = cv2.bilateralFilter(roi, 5, 50, 100)
 
         if pressed_key == ord('h'):
             mask.create_hand_hist(roi)
@@ -45,13 +45,16 @@ def main():
             cv2.imshow("hist_mask", hist_mask)
             cv2.imshow("bg_mask", bg_sub_mask)
 
-            cv2.imshow("thr_hist_mask", mask.threshold(hist_mask))
-            cv2.imshow("thr_bg_mask", mask.threshold(bg_sub_mask))
+            cv2.imshow("thr_hist_mask", detect.threshold(hist_mask))
+            cv2.imshow("thr_bg_mask", detect.threshold(bg_sub_mask))
 
             m = cv2.bitwise_and(bg_sub_mask, hist_mask)
             cv2.imshow("Mask", m)
 
-            cv2.imshow("thresh_mask", mask.threshold(m))
+            cv2.imshow("thresh_mask", detect.threshold(m))
+
+            detect.detect_hand(roi, m)
+
         elif not mask.is_hand_hist_created:
             roi = mask.draw_rect(roi)
 

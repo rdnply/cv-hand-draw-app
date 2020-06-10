@@ -30,11 +30,8 @@ class Masking:
         fgmask = self.bg_subtractor.apply(frame, learningRate=self.bg_subtractor_lr)
 
         kernel = np.ones((3, 3), np.uint8)
-        # MORPH_OPEN removes noise
-        # MORPH_CLOSE closes the holes in the object
-        # fgmask = cv2.erode(fgmask, kernel, iterations=1)
-        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel, iterations=1)
-        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, iterations=1)
+        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel, iterations=1)  # removes noise
+        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, iterations=1)  # closes the holes in the object
 
         return cv2.bitwise_and(frame, frame, mask=fgmask)
 
@@ -84,8 +81,6 @@ class Masking:
         kernel = np.ones((5, 5), np.uint8)
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=7)
         thresh = cv2.dilate(thresh, kernel, iterations=13)
-        # thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=7)
-        # thresh = cv2.erode(thresh, kernel, iterations=5)
 
         thresh = cv2.merge((thresh, thresh, thresh))
         return cv2.bitwise_and(frame, thresh)

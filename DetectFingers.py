@@ -5,26 +5,15 @@ import math
 
 class DetectFingers:
     def __init__(self):
-        self.max_angle = 60
-        self.default_color = [0, 0, 255]
+        self.points_to_draw = {}
+        self.colors = {
+            "red": [0, 0, 255],
+            "blue": [255, 0, 0],
+            "green": [0, 255, 0],
+            "yellow": [0, 255, 255]
+        }
+        self.default_color = self.colors["red"]
         self.selected_color = self.default_color
-        self.drawing_points = {}
-        self.is_delete = False
-
-    def threshold(self, mask):
-        gray_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray_mask, 60, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-        return thresh
-
-    def del_with_less_dist(self, dist, defects):
-        res = []
-        for i in range(len(defects)):
-            _, _, _, d = defects[i, 0]
-            if d >= dist:
-                res.append(defects[i, 0])
-
-        return np.array(res)
 
     def reorder_defects(self, defects):
         defects = self.sort_defects(defects)
@@ -51,6 +40,15 @@ class DetectFingers:
 
         return fars_by_peak
 
+    def del_with_less_dist(self, dist, defects):
+        res = []
+        for i in range(len(defects)):
+            _, _, _, d = defects[i, 0]
+            if d >= dist:
+                res.append(defects[i, 0])
+
+        return np.array(res)
+
     def sort_defects(self, defects):
         min_key = defects.min()
 
@@ -71,14 +69,6 @@ class DetectFingers:
             new.append(t)
 
         return np.array(new)
-
-    def get_max_y(self, defects, contour):
-        mx = 0
-        for key in defects:
-            peak = contour[key, 0]
-            mx = max(mx, peak[1])
-
-        return mx
 
     def count_fingers(self, contour):
         hull = cv2.convexHull(contour, returnPoints=False)
@@ -101,6 +91,14 @@ class DetectFingers:
             return fingertips
 
         return []
+
+    def get_max_y(self, defects, contour):
+        mx = 0
+        for key in defects:
+            peak = contour[key, 0]
+            mx = max(mx, peak[1])
+
+        return mx
 
     def calculate_angle(self, start, end, far):
         a = np.sqrt((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2)
@@ -125,7 +123,6 @@ class DetectFingers:
         return contours[max_index]
 
     def clustering(self, hull):
-        # max_dist = 50
         max_dist = 30
 
         clusters = []
@@ -185,7 +182,7 @@ class DetectFingers:
 
         hull_points = self.clear_hull(hull)
         for p in hull_points:
-            cv2.circle(contour_and_hull, p, 4, [255, 0, 0], 2)
+            cv2.circle(contour_and_hull, p, 4, self.colors["blue"], 2)
 
         return contour_and_hull
 
@@ -195,9 +192,9 @@ class DetectFingers:
 
         return contour_and_hull
 
-    def draw(self, contour_and_hull):
-        for p in self.drawing_points:
-            cv2.circle(contour_and_hull, p, 4, self.drawing_points[p], -1)
+    def draw(self, frame):
+        for p in self.points_to_draw:
+            cv2.circle(frame, p, 4, self.points_to_draw[p], -1)
 
     def centroid_of_hand(self, max_contour):
         moment = cv2.moments(max_contour)
@@ -231,14 +228,17 @@ class DetectFingers:
             else:
                 return None
 
+    def threshold(self, mask):
+        gray_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        _, thresh = cv2.threshold(gray_mask, 60, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        return thresh
+
     def detect_hand(self, frame, mask):
         thresh = self.threshold(mask)
-        # cv2.imshow("Overall thresh", thresh)
-
         _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         if len(contours) > 0:
             max_contour = self.get_max_contour(contours)
-
             contour_and_hull = self.draw_contour_and_hull(frame, max_contour)
             fingertips = self.count_fingers(max_contour)
 
@@ -248,25 +248,17 @@ class DetectFingers:
                 cv2.circle(contour_and_hull, tuple(centroid), 4, [50, 255, 0], -1)
                 far_point = self.farthest_point(max_contour, centroid)
                 if far_point is not None:
-                    self.drawing_points[far_point] = self.default_color
+                    self.points_to_draw[far_point] = self.default_color
                     cv2.circle(contour_and_hull, tuple(far_point), 8, [255, 255, 255], -1)
 
-                    # if self.is_delete and far_point in self.drawing_points:
-                    #     self.drawing_points.pop(far_point)
-                    # else:
-                    #     self.drawing_points[far_point] = self.default_color
-                    #     cv2.circle(contour_and_hull, tuple(far_point), 8, [255, 255, 255], -1)
-                    #     # contour_and_hull = self.draw_fingertips(contour_and_hull, fingertips)
-
             elif num_fingers == 2:
-                self.selected_color = [255, 0, 0]
+                self.selected_color = self.colors["blue"]
             elif num_fingers == 3:
-                self.selected_color = [0, 255, 0]
+                self.selected_color = self.colors["green"]
             elif num_fingers == 4:
-                self.selected_color = [0, 255, 255]
+                self.selected_color = self.colors["yellow"]
             elif num_fingers == 5:
-                self.drawing_points.clear()
-                # self.is_delete = not self.is_delete
+                self.points_to_draw.clear()
             elif num_fingers == 0:
                 self.default_color = self.selected_color
 

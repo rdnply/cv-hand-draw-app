@@ -13,36 +13,125 @@ class DetectFingers:
 
         return thresh
 
+    # def reorder_defects(self, defects):
+    #     defects = self.sort_defects(defects)
+    #     defects = defects[defects[0, 0, 3] >= 1000]
+    #     s, e, f, _ = defects[0, 0]
+    #     first_value = f
+    #     fars_by_peak = {e: [f]}
+    #     first_key = e
+    #     prev_key = e
+    #     for i in range(len(defects)):
+    #
+    #         if i == len(defects) - 1:
+    #             fars_by_peak[prev_key] = [f, first_value]
+    #             break
+    #
+    #         s, e, f, d = defects[i, 0]
+    #         if d < 1000:
+    #             continue
+    #
+    #         fars_by_peak[prev_key].append(f)
+    #         fars_by_peak[e] = [f]
+    #         prev_key = e
+    #
+    #     fars_by_peak.pop(first_key)
+    #
+    #     return fars_by_peak
+
+    def del_with_less_dist(self, dist, defects):
+        res = []
+        for i in range(len(defects)):
+            _, _, _, d = defects[i, 0]
+            if d >= dist:
+                res.append(defects[i, 0])
+
+        return np.array(res)
+
     def reorder_defects(self, defects):
-        s, e, f, _ = defects[0, 0]
-        first_value = f
-        fars_by_peak = {e: [f]}
+        defects = self.sort_defects(defects)
+        defects = self.del_with_less_dist(1000, defects)
+        # defects = defects[defects[0, 0, 3] >= 1000]
+        if len(defects) == 0:
+            return []
+
+        s, e, f, _ = defects[0]
+        fars_by_peak = {s: [f], e: [f]}
+        first_key = s
         prev_key = e
         for i in range(len(defects)):
 
             if i == len(defects) - 1:
-                fars_by_peak[prev_key] = [f, first_value]
+                s, e, f, _ = defects[i]
+                fars_by_peak[first_key].append(f)
+                fars_by_peak[prev_key].append(f)
                 break
 
-            s, e, f, d = defects[i, 0]
-            if d < 1000:
-                continue
-                
+            s, e, f, _ = defects[i]
             fars_by_peak[prev_key].append(f)
             fars_by_peak[e] = [f]
             prev_key = e
 
+        # fars_by_peak.pop(first_key)
+
         return fars_by_peak
 
+    def sort_defects(self, defects):
+        min_key = defects.min()
+
+        new = []
+        tail = []
+        find_min_key = False
+        for i in range(len(defects)):
+            s, e, f, _ = defects[i, 0]
+            if s != min_key and not find_min_key:
+                tail.append(defects[i])
+            elif s == min_key:
+                new.append(defects[i])
+                find_min_key = True
+            else:
+                new.append(defects[i])
+
+        for t in tail:
+            new.append(t)
+
+        return np.array(new)
+
+    def print_all_defects(self, defects, contour):
+        for i in range(len(defects)):
+            s, e, f, d = defects[i, 0]
+            print("Start index: ", s, ",end_index:", e, ",far_index: ", f, ",dist: ", d)
+            ss = contour[s, 0]
+            ee = contour[e, 0]
+            ff = contour[f, 0]
+            print("Start point: ", ss, ",end point: ", ee, ",far point: ", ff)
 
     def count_fingers(self, contour, contour_and_hull):
         hull = cv2.convexHull(contour, returnPoints=False)
         if len(hull) > 3:
-            defects = cv2.convexityDefects(contour, hull)
-            cnt = 0
-            if type(defects) != type(None):
-                defects = self.reorder_defects(defects)
+            defects1 = cv2.convexityDefects(contour, hull)
+            # if type(defects1) != type(None):
+            #     defects = self.reorder_defects(defects1)
+            #     # self.print_all_defects(defects, contour)
+            #     for i in range(len(defects)):
+            #         s, e, f, d = defects[i]
+            #         if d < 1000:
+            #             continue
+            #         far = contour[f, 0]
+            #         start = contour[s, 0]
+            #         end = contour[e, 0]
+            #         # cv2.circle(contour_and_hull, tuple(start), 8, [150, 0, 150], -1)
+            #         # cv2.circle(contour_and_hull, tuple(end), 8, [150, 0, 150], -1)
+            #         cv2.circle(contour_and_hull, tuple(far), 8, [255, 0, 0], -1)
+            #
+            # return False, 0
 
+            cnt = 0
+            if type(defects1) != type(None):
+                # self.print_all_defects(defects, contour)
+                defects = self.reorder_defects(defects1)
+
+                i = 1
                 for key in defects:
                     fars = defects[key]
                     first_far = contour[fars[0], 0]
@@ -55,12 +144,15 @@ class DetectFingers:
 
                     # Ignore the defects which are small and wide
                     # Probably not fingers
-                    if angle <= math.pi / 2:
+                    if angle <= math.pi / 3:
                         cnt += 1
-                        cv2.circle(contour_and_hull, tuple(peak), 8, [150, 150, 150], -1)
+                        # cv2.circle(contour_and_hull, tuple(peak), 8, [150, 150, 150], -1)
+                        cv2.circle(contour_and_hull, tuple(peak), 8, [150, i * 25, 150], -1)
                         cv2.circle(contour_and_hull, tuple(first_far), 8, [255, 0, 0], -1)
                         cv2.circle(contour_and_hull, tuple(second_far), 8, [255, 0, 0], -1)
+                    i += 1
             return True, cnt
+
         return False, 0
 
     # def count_fingers(self, contour, contour_and_hull):
@@ -104,7 +196,6 @@ class DetectFingers:
         b = np.sqrt((far[0] - start[0]) ** 2 + (far[1] - start[1]) ** 2)
         c = np.sqrt((end[0] - far[0]) ** 2 + (end[1] - far[1]) ** 2)
         angle = np.arccos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c))
-        # angle = math.acos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c))
 
         return angle
 
@@ -172,32 +263,6 @@ class DetectFingers:
 
         return centroid
 
-        # sum_by_x = 0
-        # sum_by_y = 0
-        # for cl in cluster:
-        #     x, y = cl
-        #     sum_by_x += x
-        #     sum_by_y += y
-        #
-        # sum_by_x /= len(cluster)
-        # sum_by_y /= len(cluster)
-        # avrg = (sum_by_x, sum_by_y)
-        #
-        # min_diff = float('inf')
-        # min_ind = 0
-        #
-        # for i in range(len(cluster)):
-        #     if min_diff > self.dist(cluster[i], avrg):
-        #         min_diff = self.dist(cluster[i], avrg)
-        #         min_ind = i
-
-        # for i in range(1, len(cluster)):
-        #     if min_diff > self.dist(cluster[i], cluster[min_ind]):
-        #         min_diff = self.dist(cluster[i], cluster[min_ind])
-        #         min_ind = i
-
-        # return cluster[min_ind]
-
     def dist(self, first, second):
         return np.sqrt((first[0] - second[0]) ** 2 + (first[1] - second[1]) ** 2)
 
@@ -215,6 +280,11 @@ class DetectFingers:
             hull_points = self.clear_hull(hull)
             cv2.drawContours(contour_and_hull, [max_contour], 0, (0, 255, 0), 2)
             cv2.drawContours(contour_and_hull, [hull], 0, (0, 0, 255), 3)
+
+            # i = 0
+            # for p in hull_points:
+            #     cv2.circle(contour_and_hull, p, 4, [255, i * 15, max(255 - i * 15, 0)], i)
+            #     i += 1
 
             for p in hull_points:
                 cv2.circle(contour_and_hull, p, 4, [255, 0, 0], 2)

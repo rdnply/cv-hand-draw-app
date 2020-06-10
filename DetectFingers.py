@@ -6,38 +6,16 @@ import math
 class DetectFingers:
     def __init__(self):
         self.max_angle = 60
+        self.default_color = [0, 0, 255]
+        self.selected_color = self.default_color
+        self.drawing_points = {}
+        self.is_delete = False
 
     def threshold(self, mask):
         gray_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         _, thresh = cv2.threshold(gray_mask, 60, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         return thresh
-
-    # def reorder_defects(self, defects):
-    #     defects = self.sort_defects(defects)
-    #     defects = defects[defects[0, 0, 3] >= 1000]
-    #     s, e, f, _ = defects[0, 0]
-    #     first_value = f
-    #     fars_by_peak = {e: [f]}
-    #     first_key = e
-    #     prev_key = e
-    #     for i in range(len(defects)):
-    #
-    #         if i == len(defects) - 1:
-    #             fars_by_peak[prev_key] = [f, first_value]
-    #             break
-    #
-    #         s, e, f, d = defects[i, 0]
-    #         if d < 1000:
-    #             continue
-    #
-    #         fars_by_peak[prev_key].append(f)
-    #         fars_by_peak[e] = [f]
-    #         prev_key = e
-    #
-    #     fars_by_peak.pop(first_key)
-    #
-    #     return fars_by_peak
 
     def del_with_less_dist(self, dist, defects):
         res = []
@@ -51,7 +29,6 @@ class DetectFingers:
     def reorder_defects(self, defects):
         defects = self.sort_defects(defects)
         defects = self.del_with_less_dist(1000, defects)
-        # defects = defects[defects[0, 0, 3] >= 1000]
         if len(defects) == 0:
             return []
 
@@ -71,8 +48,6 @@ class DetectFingers:
             fars_by_peak[prev_key].append(f)
             fars_by_peak[e] = [f]
             prev_key = e
-
-        # fars_by_peak.pop(first_key)
 
         return fars_by_peak
 
@@ -97,99 +72,35 @@ class DetectFingers:
 
         return np.array(new)
 
-    def print_all_defects(self, defects, contour):
-        for i in range(len(defects)):
-            s, e, f, d = defects[i, 0]
-            print("Start index: ", s, ",end_index:", e, ",far_index: ", f, ",dist: ", d)
-            ss = contour[s, 0]
-            ee = contour[e, 0]
-            ff = contour[f, 0]
-            print("Start point: ", ss, ",end point: ", ee, ",far point: ", ff)
+    def get_max_y(self, defects, contour):
+        mx = 0
+        for key in defects:
+            peak = contour[key, 0]
+            mx = max(mx, peak[1])
 
-    def count_fingers(self, contour, contour_and_hull):
+        return mx
+
+    def count_fingers(self, contour):
         hull = cv2.convexHull(contour, returnPoints=False)
         if len(hull) > 3:
-            defects1 = cv2.convexityDefects(contour, hull)
-            # if type(defects1) != type(None):
-            #     defects = self.reorder_defects(defects1)
-            #     # self.print_all_defects(defects, contour)
-            #     for i in range(len(defects)):
-            #         s, e, f, d = defects[i]
-            #         if d < 1000:
-            #             continue
-            #         far = contour[f, 0]
-            #         start = contour[s, 0]
-            #         end = contour[e, 0]
-            #         # cv2.circle(contour_and_hull, tuple(start), 8, [150, 0, 150], -1)
-            #         # cv2.circle(contour_and_hull, tuple(end), 8, [150, 0, 150], -1)
-            #         cv2.circle(contour_and_hull, tuple(far), 8, [255, 0, 0], -1)
-            #
-            # return False, 0
-
-            cnt = 0
-            if type(defects1) != type(None):
-                # self.print_all_defects(defects, contour)
-                defects = self.reorder_defects(defects1)
-
-                i = 1
+            defects = cv2.convexityDefects(contour, hull)
+            fingertips = []
+            if defects is not None:
+                defects = self.reorder_defects(defects)
+                max_y = self.get_max_y(defects, contour)
                 for key in defects:
                     fars = defects[key]
                     first_far = contour[fars[0], 0]
                     second_far = contour[fars[1], 0]
                     peak = contour[key, 0]
 
-                    print(first_far, second_far, peak)
-
                     angle = self.calculate_angle(first_far, second_far, peak)
+                    if angle <= math.pi / 3 and peak[1] != max_y:
+                        fingertips.append(peak)
 
-                    # Ignore the defects which are small and wide
-                    # Probably not fingers
-                    if angle <= math.pi / 3:
-                        cnt += 1
-                        # cv2.circle(contour_and_hull, tuple(peak), 8, [150, 150, 150], -1)
-                        cv2.circle(contour_and_hull, tuple(peak), 8, [150, i * 25, 150], -1)
-                        cv2.circle(contour_and_hull, tuple(first_far), 8, [255, 0, 0], -1)
-                        cv2.circle(contour_and_hull, tuple(second_far), 8, [255, 0, 0], -1)
-                    i += 1
-            return True, cnt
+            return fingertips
 
-        return False, 0
-
-    # def count_fingers(self, contour, contour_and_hull):
-    #     hull = cv2.convexHull(contour, returnPoints=False)
-    #     if len(hull) > 3:
-    #         defects = cv2.convexityDefects(contour, hull)
-    #         cnt = 0
-    #
-    #         # if type(defects) != type(None):
-    #         #     ss, ee ,ff ,dd = defects[0, 0]
-    #         #     st = tuple(contour[0, 0])
-    #         #     en = tuple(contour[len(contour)//6, 0])
-    #         #     fa = tuple(contour[len(contour)-1, 0])
-    #         #     cv2.circle(contour_and_hull, fa, 8, [255, 0, 0], -1)
-    #         #     cv2.circle(contour_and_hull, st, 8, [0, 255, 0], -1)
-    #         #     cv2.circle(contour_and_hull, en, 8, [255, 0, 255], -1)
-    #
-    #         s, e, f, first_d = defects[0, 0]
-    #         first_start = tuple(contour[s, 0])
-    #         first_end = tuple(contour[e, 0])
-    #         first_far = tuple(contour[f, 0])
-    #
-    #         if type(defects) != type(None):
-    #             for i in range(defects.shape[0]):
-    #                 s, e, f, d = defects[i, 0]
-    #                 start = tuple(contour[s, 0])
-    #                 end = tuple(contour[e, 0])
-    #                 far = tuple(contour[f, 0])
-    #                 angle = self.calculate_angle(start, end, far)
-    #
-    #                 # Ignore the defects which are small and wide
-    #                 # Probably not fingers
-    #                 if d > 10000 and angle <= np.pi / 2:
-    #                     cnt += 1
-    #                     cv2.circle(contour_and_hull, far, 8, [255, 0, 0], -1)
-    #         return True, cnt
-    #     return False, 0
+        return []
 
     def calculate_angle(self, start, end, far):
         a = np.sqrt((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2)
@@ -266,31 +177,98 @@ class DetectFingers:
     def dist(self, first, second):
         return np.sqrt((first[0] - second[0]) ** 2 + (first[1] - second[1]) ** 2)
 
+    def draw_contour_and_hull(self, frame, contour):
+        contour_and_hull = np.zeros(frame.shape, np.uint8)
+        hull = cv2.convexHull(contour)
+        cv2.drawContours(contour_and_hull, [contour], 0, (0, 255, 0), 2)
+        cv2.drawContours(contour_and_hull, [hull], 0, (0, 0, 255), 3)
+
+        hull_points = self.clear_hull(hull)
+        for p in hull_points:
+            cv2.circle(contour_and_hull, p, 4, [255, 0, 0], 2)
+
+        return contour_and_hull
+
+    def draw_fingertips(self, contour_and_hull, fingertips):
+        for f in fingertips:
+            cv2.circle(contour_and_hull, tuple(f), 8, [255, 0, 255], -1)
+
+        return contour_and_hull
+
+    def draw(self, contour_and_hull):
+        for p in self.drawing_points:
+            cv2.circle(contour_and_hull, p, 4, self.drawing_points[p], -1)
+
+    def centroid_of_hand(self, max_contour):
+        moment = cv2.moments(max_contour)
+        if moment['m00'] != 0:
+            cx = int(moment['m10'] / moment['m00'])
+            cy = int(moment['m01'] / moment['m00'])
+            return cx, cy
+        else:
+            return None
+
+    def farthest_point(self, max_contour, centroid):
+        hull = cv2.convexHull(max_contour, returnPoints=False)
+        defects = cv2.convexityDefects(max_contour, hull)
+        if defects is not None and centroid is not None:
+            s = defects[:, 0][:, 0]
+            cx, cy = centroid
+
+            x = np.array(max_contour[s][:, 0][:, 0], dtype=np.float)
+            y = np.array(max_contour[s][:, 0][:, 1], dtype=np.float)
+
+            xp = cv2.pow(cv2.subtract(x, cx), 2)
+            yp = cv2.pow(cv2.subtract(y, cy), 2)
+            dist = cv2.sqrt(cv2.add(xp, yp))
+
+            dist_max_i = np.argmax(dist)
+
+            if dist_max_i < len(s):
+                farthest_defect = s[dist_max_i]
+                farthest_point = tuple(max_contour[farthest_defect, 0])
+                return farthest_point
+            else:
+                return None
+
     def detect_hand(self, frame, mask):
         thresh = self.threshold(mask)
-        cv2.imshow("Overall thresh", thresh)
+        # cv2.imshow("Overall thresh", thresh)
 
         _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         if len(contours) > 0:
             max_contour = self.get_max_contour(contours)
 
-            # Draw contour and hull
-            contour_and_hull = np.zeros(frame.shape, np.uint8)
-            hull = cv2.convexHull(max_contour)
-            hull_points = self.clear_hull(hull)
-            cv2.drawContours(contour_and_hull, [max_contour], 0, (0, 255, 0), 2)
-            cv2.drawContours(contour_and_hull, [hull], 0, (0, 0, 255), 3)
+            contour_and_hull = self.draw_contour_and_hull(frame, max_contour)
+            fingertips = self.count_fingers(max_contour)
 
-            # i = 0
-            # for p in hull_points:
-            #     cv2.circle(contour_and_hull, p, 4, [255, i * 15, max(255 - i * 15, 0)], i)
-            #     i += 1
+            num_fingers = len(fingertips)
+            if num_fingers == 1:
+                centroid = self.centroid_of_hand(max_contour)
+                cv2.circle(contour_and_hull, tuple(centroid), 4, [50, 255, 0], -1)
+                far_point = self.farthest_point(max_contour, centroid)
+                if far_point is not None:
+                    self.drawing_points[far_point] = self.default_color
+                    cv2.circle(contour_and_hull, tuple(far_point), 8, [255, 255, 255], -1)
 
-            for p in hull_points:
-                cv2.circle(contour_and_hull, p, 4, [255, 0, 0], 2)
+                    # if self.is_delete and far_point in self.drawing_points:
+                    #     self.drawing_points.pop(far_point)
+                    # else:
+                    #     self.drawing_points[far_point] = self.default_color
+                    #     cv2.circle(contour_and_hull, tuple(far_point), 8, [255, 255, 255], -1)
+                    #     # contour_and_hull = self.draw_fingertips(contour_and_hull, fingertips)
 
-            found, cnt = self.count_fingers(max_contour, contour_and_hull)
+            elif num_fingers == 2:
+                self.selected_color = [255, 0, 0]
+            elif num_fingers == 3:
+                self.selected_color = [0, 255, 0]
+            elif num_fingers == 4:
+                self.selected_color = [0, 255, 255]
+            elif num_fingers == 5:
+                self.drawing_points.clear()
+                # self.is_delete = not self.is_delete
+            elif num_fingers == 0:
+                self.default_color = self.selected_color
+
+            self.draw(frame)
             cv2.imshow("Contour and Hull", contour_and_hull)
-
-            if found:
-                print(cnt)

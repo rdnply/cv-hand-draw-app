@@ -22,6 +22,7 @@ def main():
 
     top, right, bottom, left = mask.get_roi_coord()
 
+    i = 1
     while capture.isOpened():
         _, frame = capture.read()
         frame = cv2.bilateralFilter(frame, 5, 50, 100)
@@ -48,12 +49,19 @@ def main():
             cv2.imshow("thr_hist_mask", detect.threshold(hist_mask))
             cv2.imshow("thr_bg_mask", detect.threshold(bg_sub_mask))
 
-            m = cv2.bitwise_and(bg_sub_mask, hist_mask)
-            cv2.imshow("Mask", m)
+            # m = cv2.bitwise_and(bg_sub_mask, hist_mask)
+            # cv2.imshow("Mask", m)
+            #
+            # cv2.imshow("thresh_mask", detect.threshold(m))
+            cv2.imshow("Mask", bg_sub_mask)
 
-            cv2.imshow("thresh_mask", detect.threshold(m))
+            cv2.imshow("thresh_mask", detect.threshold(bg_sub_mask))
 
-            detect.detect_hand(roi, m)
+            if i > 250:
+                print('here')
+
+            # detect.detect_hand(roi, m)
+            detect.detect_hand(roi, bg_sub_mask)
 
         elif not mask.is_hand_hist_created:
             roi = mask.draw_rect(roi)
@@ -62,6 +70,9 @@ def main():
 
         if pressed_key == 27:
             break
+
+        i += 1
+        print(i)
 
     cv2.destroyAllWindows()
     capture.release()

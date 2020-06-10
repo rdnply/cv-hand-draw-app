@@ -53,7 +53,7 @@ def main():
 
             cv2.imshow("Mask", overall_mask)
             cv2.imshow("thresh_mask", detect.threshold(overall_mask))
-            detect.detect_hand(roi, overall_mask)
+            detect.draw_using_hand(roi, overall_mask)
 
         elif not mask.is_hand_hist_created and not mask.is_bg_captured:
             roi = mask.draw_rect(roi)

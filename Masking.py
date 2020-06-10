@@ -39,6 +39,10 @@ class Masking:
         return self.top, self.right, self.bottom, self.left
 
     def draw_rect(self, frame):
+        """
+        Draw rectangles where
+        to get info about color of observable object
+        """
         rows, cols, _ = frame.shape
 
         frame_with_rect = frame.copy()

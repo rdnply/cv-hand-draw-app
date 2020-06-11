@@ -41,18 +41,11 @@ def main():
             hist_mask = None
             if mask.is_hand_hist_created:
                 hist_mask = mask.hist_masking(roi)
-                cv2.imshow("hist_mask", hist_mask)
-                cv2.imshow("thr_hist_mask", detect.threshold(hist_mask))
-
-            cv2.imshow("bg_mask", bg_sub_mask)
-            cv2.imshow("thr_bg_mask", detect.threshold(bg_sub_mask))
 
             overall_mask = bg_sub_mask
             if hist_mask is not None:
                 overall_mask = cv2.bitwise_and(bg_sub_mask, hist_mask)
 
-            cv2.imshow("Mask", overall_mask)
-            cv2.imshow("thresh_mask", detect.threshold(overall_mask))
             detect.draw_using_hand(roi, overall_mask)
 
         elif not mask.is_hand_hist_created and not mask.is_bg_captured:

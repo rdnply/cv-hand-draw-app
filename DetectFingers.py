@@ -18,8 +18,6 @@ class DetectFingers:
         self.selected_color = self.default_color
 
     def reorder_defects(self, defects):
-        defects = self.sort_defects(defects)
-        defects = self.del_with_less_dist(1000, defects)
         if len(defects) == 0:
             return []
 
@@ -77,6 +75,8 @@ class DetectFingers:
             defects = cv2.convexityDefects(contour, hull)
             fingertips = []
             if defects is not None:
+                defects = self.sort_defects(defects)
+                defects = self.del_with_less_dist(1000, defects)
                 defects = self.reorder_defects(defects)
                 max_y = self.get_max_y(defects, contour)
                 for key in defects:
@@ -256,6 +256,7 @@ class DetectFingers:
         num_fingers, max_cont = self.hand_recognition(mask)
 
         contour_and_hull = self.draw_contour_and_hull(frame.shape, max_cont)
+        print(num_fingers)
         if num_fingers == 1:
             centroid = self.centroid_of_hand(max_cont)
             cv2.circle(contour_and_hull, tuple(centroid), 4, [50, 255, 0], -1)
